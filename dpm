@@ -61,15 +61,13 @@ if [ "$action" == "init" ]; then
     # 1. 아치 리눅스 컨테이너 생성
     distrobox-create --name $CONTAINER_NAME --image docker.io/library/archlinux:latest --yes
     
-    # 2. 시스템 설정 (로케일 생성 & Multilib 활성화)
-    echo "⚙️  Configuring system (Locale & Multilib)..."
+    # 2. 시스템 설정 (로케일, Multilib, 병렬 다운로드)
+    echo "⚙️  Configuring system..."
     
     distrobox-enter arch-dev -- sudo bash <<EOF
         # --- 1) 로케일 설정 ---
-        # en_US.UTF-8 기본 활성화
         sed -i 's/^#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
         
-        # 호스트 언어 감지 및 활성화
         HOST_LANG="$LANG"
         if [ -n "\$HOST_LANG" ]; then
             echo "   -> Detected host locale: \$HOST_LANG"
@@ -77,14 +75,16 @@ if [ "$action" == "init" ]; then
             sed -i "s/^#\$CLEAN_LANG/\$CLEAN_LANG/" /etc/locale.gen
         fi
         
-        # 로케일 적용
         locale-gen
 
         # --- 2) Multilib 활성화 ---
         echo "   -> Enabling multilib repository..."
-        # pacman.conf에서 [multilib] 섹션과 그 바로 아래 Include 라인의 주석(#) 제거
-        # sed 범위 지정(/start/,/end/)을 사용하여 두 줄을 동시에 처리
         sed -i "/\[multilib\]/,/Include/"'s/^#//' /etc/pacman.conf
+
+        # --- 3) 병렬 다운로드 활성화 (속도 향상) ---
+        echo "   -> Setting ParallelDownloads to 10..."
+        # #ParallelDownloads = 5  <-- 이 줄을 찾아서 ParallelDownloads = 10 으로 변경
+        sed -i 's/^#ParallelDownloads.*/ParallelDownloads = 10/' /etc/pacman.conf
 EOF
 
     # 3. 시스템 업데이트 및 필수 패키지 설치
