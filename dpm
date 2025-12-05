@@ -40,13 +40,19 @@ auto_export_apps() {
     # 2. grep: .desktop 파일만 필터링 (/usr/share/applications/ 경로)
     # 3. while read: 발견된 파일마다 distrobox-export 실행
     
-    distrobox-enter "$CONTAINER_NAME" -- bash -c "
-        pacman -Qlq '$pkg_name' 2>/dev/null | grep -E '^/usr/share/applications/.*\.desktop$' | while read -r file; do
-            app_name=\$(basename \"\$file\" .desktop)
-            echo \"🚀 Auto-exporting: \$app_name\"
-            distrobox-export --app \"\$app_name\"
+    distrobox-enter "$CONTAINER_NAME" -- bash -c '
+        TARGET_PKG="'"$pkg_name"'"
+        
+        # 패키지 파일 목록 조회 -> .desktop 파일 필터링 -> 루프
+        pacman -Qlq "$TARGET_PKG" 2>/dev/null | grep -E "^/usr/share/applications/.*\.desktop$" | while read -r file; do
+            # 파일이 실제로 존재하는지 체크
+            if [ -f "$file" ]; then
+                app_name=$(basename "$file" .desktop)
+                echo "🚀 Auto-exporting: $app_name"
+                distrobox-export --app "$app_name"
+            fi
         done
-    "
+    '
 }
 
 if [ "$action" == "init" ]; then
@@ -123,7 +129,7 @@ if [ $? -eq 0 ]; then
     if [ "$action" == "install" ]; then
         auto_export_apps "$package"
     fi
-    
+
 else
     echo "⚠️ Operation failed!"
     echo "🔄 Rolling back to snapshot ($NEW_TAG)..."
