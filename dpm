@@ -47,7 +47,7 @@ fi
 
 if [ "$action" == "self-update" ]; then
     echo "🔄 Updating dpm..."
-    sudo curl -fsSL https://raw.githubusercontent.com/hanch2396/dpm/blob/main/dpm -o /usr/local/bin/dpm
+    sudo curl -fsSL https://raw.githubusercontent.com/hanch2396/dpm/main/dpm -o /usr/local/bin/dpm
     sudo chmod +x /usr/local/bin/dpm
     echo "✅ Updated to the latest version."
     exit 0

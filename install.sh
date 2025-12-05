@@ -50,7 +50,7 @@ fi
 
 # 3. dpm 스크립트 설치
 echo "📥 Installing dpm to /usr/local/bin..."
-sudo curl -fsSL https://raw.githubusercontent.com/hanch2396/dpm/blob/main/dpm -o /usr/local/bin/dpm
+sudo curl -fsSL https://raw.githubusercontent.com/hanch2396/dpm/main/dpm -o /usr/local/bin/dpm
 sudo chmod +x /usr/local/bin/dpm
 
 # 4. 초기화 안내
