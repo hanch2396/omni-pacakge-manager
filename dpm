@@ -189,7 +189,7 @@ elif [ "$action" == "export" ]; then
     exit $?
 
 elif [ "$action" == "clean" ]; then
-    CMD="yay -Scc --noconfirm && yay -Qdtq | yay -Rns --noconfirm - 2> /dev/null"
+    CMD="yay -Scc --noconfirm &> /dev/null && yay -Qdtq | yay -Rns --noconfirm - 2> /dev/null"
     LOG_MSG="🧹 Cleaning system garbage (Orphans & Cache)..."
 
 else
