@@ -41,18 +41,19 @@ auto_export_apps() {
     # 3. while read: 발견된 파일마다 distrobox-export 실행
     
     distrobox-enter "$CONTAINER_NAME" -- bash -c '
-        TARGET_PKG="'"$pkg_name"'"
+        target_pkg="$1"
         
-        # 패키지 파일 목록 조회 -> .desktop 파일 필터링 -> 루프
-        pacman -Qlq "$TARGET_PKG" 2>/dev/null | grep -E "^/usr/share/applications/.*\.desktop$" | while read -r file; do
-            # 파일이 실제로 존재하는지 체크
-            if [ -f "$file" ]; then
-                app_name=$(basename "$file" .desktop)
-                echo "🚀 Auto-exporting: $app_name"
-                distrobox-export --app "$app_name"
-            fi
-        done
-    '
+        # 패키지 파일 목록 조회
+        if pacman -Qi "$target_pkg" > /dev/null 2>&1; then
+            pacman -Qlq "$target_pkg" | grep -E "^/usr/share/applications/.*\.desktop$" | while read -r file; do
+                if [ -f "$file" ]; then
+                    app_name=$(basename "$file" .desktop)
+                    echo "🚀 Auto-exporting: $app_name"
+                    distrobox-export --app "$app_name"
+                fi
+            done
+        fi
+    ' _ "$pkg_name"
 }
 
 if [ "$action" == "init" ]; then
