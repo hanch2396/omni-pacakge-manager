@@ -62,12 +62,30 @@ if [ "$action" == "init" ]; then
     # 1. 아치 리눅스 컨테이너 생성
     distrobox-create --name $CONTAINER_NAME --image docker.io/library/archlinux:latest --yes
     
-    # 2. 필수 패키지 설치 (git, base-devel, yay 설치를 위한 준비)
-    echo "📦 Setting up AUR helper (yay)..."
-    distrobox-enter $CONTAINER_NAME -- sudo pacman -Syu --noconfirm base-devel git
+    # 2. 필수 패키지 설치
+    echo "📦 Setting up base packages..."
+    distrobox-enter arch-dev -- sudo pacman -Syu --noconfirm base-devel git
     
-    # 3. yay 설치 (컨테이너 내부에서 실행)
-    distrobox-enter $CONTAINER_NAME -- bash -c "git clone https://aur.archlinux.org/yay-bin.git && cd yay-bin && makepkg -si --noconfirm && cd .. && rm -rf yay-bin"
+    # [추가됨] 3. 로케일 자동 설정 (호스트 로케일 동기화)
+    echo "🌍 Generating locales..."
+    distrobox-enter arch-dev -- sudo bash -c '
+        # 1. en_US.UTF-8은 기본으로 활성화
+        sed -i "s/^#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/" /etc/locale.gen
+        
+        # 2. 호스트의 LANG이 설정되어 있다면 해당 로케일도 활성화 (예: ko_KR.UTF-8)
+        if [ -n "$LANG" ]; then
+            # .UTF-8 같은 뒷부분을 포함해서 정확히 매칭되는 라인 주석 해제
+            CLEAN_LANG=$(echo "$LANG" | sed "s/\./\\\./") # 정규식용 이스케이프
+            sed -i "s/^#$CLEAN_LANG/$CLEAN_LANG/" /etc/locale.gen
+        fi
+        
+        # 3. 로케일 생성 적용
+        locale-gen
+    '
+
+    # 4. yay 설치
+    echo "📦 Setting up AUR helper (yay)..."
+    distrobox-enter arch-dev -- bash -c "git clone https://aur.archlinux.org/yay-bin.git && cd yay-bin && makepkg -si --noconfirm && cd .. && rm -rf yay-bin"
     
     echo "✨ Initialization complete! You can now use 'dpm install <package>'."
     exit 0
