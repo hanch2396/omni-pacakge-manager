@@ -138,10 +138,6 @@ elif [ "$action" == "upgrade" ]; then
 elif [ "$action" == "enter" ]; then
     # 사용법 1: dpm enter          (단순 셸 진입)
     # 사용법 2: dpm enter [명령어] (컨테이너 안에서 특정 명령어 실행)
-    
-    # "enter"라는 첫 번째 인자는 처리했으므로 제거(shift)합니다.
-    # 이제 "$@"에는 enter 뒤에 오는 나머지 인자들만 남습니다.
-    shift 
 
     if [ $# -eq 0 ]; then
         # 추가 인자가 없으면 그냥 셸로 진입
@@ -158,15 +154,33 @@ elif [ "$action" == "enter" ]; then
     # 실행 후 종료 코드 전달
     exit $?
 
+elif [ "$action" == "export" ]; then
+    # 수동 Export 기능
+     if [ $# -eq 0 ]; then
+        echo "❌ Error: App name required."
+        exit 1
+    fi
+    distrobox-enter "$CONTAINER_NAME" -- distrobox-export --app "$1"
+    exit $?
+
 else
-    # 그 외 명령어(remove, search 등)는 스냅샷 없이 패스스루하거나 별도 처리
-    distrobox-enter "$CONTAINER_NAME" -- yay "$@"
-    exit 0
+    # 알 수 없는 명령어 처리 (오타 방지)
+    echo "❌ Unknown command: '$action'"
+    echo "   Did you mean 'install'?"
+    echo "Usage: dpm [init|install|remove|upgrade|enter|export] ..."
+    exit 1
 fi
 
 # ---------------------------------------------------------
-# 스냅샷 및 실행 로직 (install과 upgrade 모두 적용)
+# 실행 로직 (install, remove, upgrade만 여기로 옴)
 # ---------------------------------------------------------
+
+# 0. 컨테이너 존재 확인 (안전을 위해)
+if ! podman container exists "$CONTAINER_NAME"; then
+    echo "❌ Container '$CONTAINER_NAME' not found."
+    echo "   Please run 'dpm init' first."
+    exit 1
+fi
 
 # 1. 스냅샷 생성
 TIMESTAMP=$(date +%Y%m%d%H%M%S)
