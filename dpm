@@ -3,7 +3,7 @@
 # --- 설정 ---
 CONTAINER_NAME="dpm-arch"             # Distrobox 컨테이너 이름
 BACKUP_REPO="${CONTAINER_NAME}-backup" # 백업 이미지가 저장될 레포지토리 이름
-MAX_BACKUPS=3                         # 유지할 최대 백업 개수
+MAX_BACKUPS=2                         # 유지할 최대 백업 개수
 
 action=$1
 
