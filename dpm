@@ -188,6 +188,10 @@ elif [ "$action" == "export" ]; then
     distrobox-enter "$CONTAINER_NAME" -- distrobox-export --app "$1"
     exit $?
 
+elif [ "$action" == "clean" ]; then
+    CMD="yay -Qdtq | yay -Rns --noconfirm - && yay -Scc --noconfirm"
+    LOG_MSG="🧹 Cleaning system garbage (Orphans & Cache)..."
+
 else
     # 알 수 없는 명령어 처리 (오타 방지)
     echo "❌ Unknown command: '$action'"
@@ -252,6 +256,10 @@ else
     # 실패 시: 기존 이미지로 후퇴 (Rollback)
     # ================================
     echo "⚠️  Operation failed!"
+
+    if [ "$action" == "clean" ]; then
+        echo "✨ Likely cause: No orphan packages found. Your system is already clean!"
+    fi
     # echo "🔄 Rolling back to safety snapshot ($PRE_TAG)..."
     
     # distrobox-stop "$CONTAINER_NAME" --yes
