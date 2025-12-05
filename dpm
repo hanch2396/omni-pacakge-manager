@@ -111,6 +111,16 @@ EOF
     echo "📦 Setting up AUR helper (yay)..."
     distrobox-enter $CONTAINER_NAME -- bash -c "git clone https://aur.archlinux.org/yay-bin.git && cd yay-bin && makepkg -si --noconfirm && cd .. && rm -rf yay-bin"
     
+    # 초기 상태 커밋 및 전환
+    echo "💾 Saving initial state..."
+    INIT_TAG="${BACKUP_REPO}:init-$(date +%Y%m%d%H%M%S)"
+    podman commit "$CONTAINER_NAME" "$INIT_TAG" > /dev/null
+    
+    echo "🔄 Switching container to initial backup layer..."
+    distrobox-stop "$CONTAINER_NAME" --yes
+    distrobox-rm "$CONTAINER_NAME" --force
+    distrobox-create --name "$CONTAINER_NAME" --image "$INIT_TAG" --yes
+
     echo "✨ Initialization complete! You can now use 'dpm install <package>'."
     exit 0
 fi
@@ -197,43 +207,60 @@ if ! podman container exists "$CONTAINER_NAME"; then
     exit 1
 fi
 
-# 1. 스냅샷 생성
-TIMESTAMP=$(date +%Y%m%d%H%M%S)
-NEW_TAG="${BACKUP_REPO}:${TIMESTAMP}"
-
-echo "📸 Creating snapshot before changes: $NEW_TAG"
-podman commit "$CONTAINER_NAME" "$NEW_TAG" > /dev/null
+# 1. [Safety] 실행 전, 현재 상태를 무조건 백업 (Rollback Point)
+#    이것이 '기존 이미지' 역할을 합니다.
+PRE_TAG="${BACKUP_REPO}:pre-$(date +%Y%m%d%H%M%S)"
+echo "💾 Creating safety snapshot (Pre-Execution): $PRE_TAG"
+podman commit "$CONTAINER_NAME" "$PRE_TAG" > /dev/null
 
 if [ $? -ne 0 ]; then
-    echo "❌ Snapshot failed. Aborting."
+    echo "❌ Safety snapshot failed. Aborting to protect data."
     exit 1
 fi
 
-# 2. 오래된 스냅샷 정리
-cleanup_old_backups
-
-# 3. 실제 명령어 실행 (install 또는 upgrade)
+# 2. 명령어 실행 (설치 시도)
 echo "$LOG_MSG"
 distrobox-enter "$CONTAINER_NAME" -- $CMD
+EXIT_CODE=$?
 
-# 4. 결과 확인 및 롤백
-if [ $? -eq 0 ]; then
+# 3. 결과에 따른 분기 처리
+if [ $EXIT_CODE -eq 0 ]; then
+    # ================================
+    # 성공 시: 새로운 상태로 전진 (Forward)
+    # ================================
     echo "✅ Success!"
-
+    
+    # 현재(설치된) 상태를 '새로운 이미지'로 저장
+    POST_TAG="${BACKUP_REPO}:post-$(date +%Y%m%d%H%M%S)"
+    echo "💾 Committing new state: $POST_TAG"
+    podman commit "$CONTAINER_NAME" "$POST_TAG" > /dev/null
+    
+    echo "🔄 Recreating container with NEW image (Incremental)..."
+    distrobox-stop "$CONTAINER_NAME" --yes
+    distrobox-rm "$CONTAINER_NAME" --force
+    distrobox-create --name "$CONTAINER_NAME" --image "$POST_TAG" --yes
+    
+    # 성공했으므로 자동 Export 실행
     if [ "$action" == "install" ]; then
-        # 입력된 모든 패키지($@)에 대해 반복 수행
         for pkg in "$@"; do
             auto_export_apps "$pkg"
         done
     fi
 
 else
-    echo "⚠️ Operation failed!"
-    echo "🔄 Rolling back to snapshot ($NEW_TAG)..."
+    # ================================
+    # 실패 시: 기존 이미지로 후퇴 (Rollback)
+    # ================================
+    echo "⚠️  Operation failed!"
+    echo "🔄 Rolling back to safety snapshot ($PRE_TAG)..."
     
     distrobox-stop "$CONTAINER_NAME" --yes
     distrobox-rm "$CONTAINER_NAME" --force
-    distrobox-create --name "$CONTAINER_NAME" --image "$NEW_TAG" --yes
+    distrobox-create --name "$CONTAINER_NAME" --image "$PRE_TAG" --yes
     
-    echo "✅ Rollback completed."
+    echo "✅ Rollback completed. System is clean."
+    exit 1
 fi
+
+# 4. 마무리: 오래된 백업 태그 정리
+cleanup_old_backups
