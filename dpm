@@ -6,7 +6,6 @@ BACKUP_REPO="${CONTAINER_NAME}-backup" # 백업 이미지가 저장될 레포지
 MAX_BACKUPS=5                         # 유지할 최대 백업 개수
 
 action=$1
-package=$2
 
 CMD=""
 LOG_MSG=""
@@ -106,13 +105,27 @@ if [ "$action" == "self-update" ]; then
     exit 0
 fi
 
+shift  # 첫 번째 인자(install, upgrade 등)를 목록에서 제거
+       # 이제부터 $1, $2... 는 모두 패키지 이름이 됩니다. ($@)
+
 if [ "$action" == "install" ]; then
-    if [ -z "$package" ]; then
-        echo "❌ Error: Package name required for install."
+    # 인자가 없으면 에러
+    if [ $# -eq 0 ]; then
+        echo "❌ Error: Package name(s) required."
         exit 1
     fi
-    CMD="yay -S $package --noconfirm"
-    LOG_MSG="📦 Installing package: $package"
+    
+    # $* : 남은 모든 인자를 공백으로 연결 (예: "pkg1 pkg2 pkg3")
+    CMD="yay -S $* --noconfirm"
+    LOG_MSG="📦 Installing packages: $*"
+
+elif [ "$action" == "remove" ]; then
+     if [ $# -eq 0 ]; then
+        echo "❌ Error: Package name(s) required."
+        exit 1
+    fi
+    CMD="yay -Rns $* --noconfirm"
+    LOG_MSG="🗑 Removing packages: $*"
 
 elif [ "$action" == "upgrade" ]; then
     # 시스템 전체 업데이트 (Arch의 표준 방식: -Syu)
@@ -176,7 +189,10 @@ if [ $? -eq 0 ]; then
     echo "✅ Success!"
 
     if [ "$action" == "install" ]; then
-        auto_export_apps "$package"
+        # 입력된 모든 패키지($@)에 대해 반복 수행
+        for pkg in "$@"; do
+            auto_export_apps "$pkg"
+        done
     fi
 
 else
