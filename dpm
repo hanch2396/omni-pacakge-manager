@@ -64,7 +64,7 @@ if [ "$action" == "init" ]; then
     # 2. 시스템 설정 (로케일, Multilib, 병렬 다운로드)
     echo "⚙️  Configuring system..."
     
-    distrobox-enter arch-dev -- sudo bash <<EOF
+    distrobox-enter $CONTAINER_NAME -- sudo bash <<EOF
         # --- 1) 로케일 설정 ---
         sed -i 's/^#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
         
@@ -90,7 +90,7 @@ EOF
     # 3. 시스템 업데이트 및 필수 패키지 설치
     # Multilib이 활성화되었으므로 -Syu 실행 시 multilib DB도 함께 동기화됩니다.
     echo "📦 Setting up base packages and updating..."
-    distrobox-enter arch-dev -- sudo pacman -Syu --noconfirm base-devel git
+    distrobox-enter $CONTAINER_NAME -- sudo pacman -Syu --noconfirm base-devel git
 
     # 4. yay 설치
     echo "📦 Setting up AUR helper (yay)..."
