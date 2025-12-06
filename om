@@ -155,7 +155,7 @@ fi
 
 if [ "$action" == "self-update" ]; then
     echo "🔄 Updating om..."
-    curl -fsSL https://raw.githubusercontent.com/hanch2396/dpm/main/dpm -o ${HOME}/.local/bin/om
+    curl -fsSL https://raw.githubusercontent.com/hanch2396/omni-pacakge-manager/main/om -o ${HOME}/.local/bin/om
     chmod +x ${HOME}/.local/bin/om
     echo "✅ Updated to the latest version."
     exit 0

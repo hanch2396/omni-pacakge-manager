@@ -54,7 +54,7 @@ curl -s https://raw.githubusercontent.com/89luca89/distrobox/main/install | sh -
 # 3. dpm 스크립트 설치
 echo "📥 Installing om to ${HOME}/.local/bin..."
 mkdir -p ${HOME}/.local/bin  # 폴더가 없을 경우 대비
-curl -fsSL https://raw.githubusercontent.com/hanch2396/dpm/main/om -o ${HOME}/.local/bin/om
+curl -fsSL https://raw.githubusercontent.com/hanch2396/omni-pacakge-manager/main/om -o ${HOME}/.local/bin/om
 chmod +x ${HOME}/.local/bin/om
 
 # --- PATH 추가 로직 시작 ---
