@@ -55,6 +55,34 @@ auto_export_apps() {
 EOF
 }
 
+auto_remove_exported_apps() {
+    local pkg_name="$1"
+    echo "🔍 Checking for GUI applications in '$pkg_name'..."
+
+    # 컨테이너 내부에서 실행할 스크립트
+    # 1. pacman -Qlq: 패키지가 설치한 파일 목록 조회 (Quiet mode)
+    # 2. grep: .desktop 파일만 필터링 (/usr/share/applications/ 경로)
+    # 3. while read: 발견된 파일마다 distrobox-export 실행
+    
+    distrobox-enter "$CONTAINER_NAME" -- bash <<EOF
+        # 패키지 이름 변수 설정 (호스트의 $pkg_name 값이 여기에 들어감)
+        TARGET="$pkg_name"
+        
+        # pacman 쿼리 실행
+        pacman -Qlq "\$TARGET" 2>/dev/null | grep -E '^/usr/share/applications/.*\.desktop$' | while read -r file; do
+            # 파일이 실제로 존재하는지 확인
+            if [ -f "\$file" ]; then
+                echo "🗑️  Un-exporting: \$file"
+                
+                # 핵심 변경 사항: --delete 옵션 추가
+                # 이 명령이 호스트의 ~/.local/share/applications/ 에서 
+                # 해당 컨테이너와 연관된 .desktop 파일을 찾아 삭제합니다.
+                distrobox-export --app "\$file" --delete
+            fi
+        done
+EOF
+}
+
 if [ "$action" == "init" ]; then
     echo "🛠 Initializing dpm environment..."
     
@@ -152,6 +180,11 @@ elif [ "$action" == "remove" ]; then
         echo "❌ Error: Package name(s) required."
         exit 1
     fi
+
+    for pkg in "$@"; do
+        auto_remove_exported_apps "$pkg"
+    done
+
     CMD="yay -Rns $* --noconfirm"
     LOG_MSG="🗑 Removing packages: $*"
 
@@ -188,6 +221,15 @@ elif [ "$action" == "export" ]; then
     distrobox-enter "$CONTAINER_NAME" -- distrobox-export --app "$1"
     exit $?
 
+elif [ "$action" == "unexport" ]; then
+    # 수동 Export 기능
+     if [ $# -eq 0 ]; then
+        echo "❌ Error: App name required."
+        exit 1
+    fi
+    distrobox-enter "$CONTAINER_NAME" -- distrobox-export --app "$1" --delete
+    exit $?
+
 elif [ "$action" == "clean" ]; then
     CMD="yay -Scc --noconfirm &> /dev/null && yay -Qdtq | yay -Rns --noconfirm - 2> /dev/null"
     LOG_MSG="🧹 Cleaning system garbage (Orphans & Cache)..."
@@ -196,7 +238,7 @@ else
     # 알 수 없는 명령어 처리 (오타 방지)
     echo "❌ Unknown command: '$action'"
     echo "   Did you mean 'install'?"
-    echo "Usage: dpm [init|self-update|install|remove|update|enter|export|clean] ..."
+    echo "Usage: dpm [init|self-update|install|remove|update|enter|export|unexport|clean] ..."
     exit 1
 fi
 
