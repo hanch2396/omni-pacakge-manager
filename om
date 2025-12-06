@@ -36,6 +36,32 @@ auto_export_apps() {
 EOF
 }
 
+auto_export_bins() {
+    local pkg_name="$1"
+    echo "🔍 Checking for binaries in '$pkg_name'..."
+
+    # 컨테이너 내부에서 실행할 스크립트
+    # 1. pacman -Qlq: 패키지 파일 목록 조회
+    # 2. grep: /usr/bin/ 경로의 파일만 필터링
+    # 3. while read: 발견된 실행 파일마다 distrobox-export --bin 실행
+    
+    distrobox-enter "$CONTAINER_NAME" -- bash <<EOF
+        TARGET="$pkg_name"
+        
+        # pacman 쿼리 실행 (/usr/bin/ 으로 시작하는 파일 검색)
+        pacman -Qlq "\$TARGET" 2>/dev/null | grep -E '^/usr/bin/' | while read -r file; do
+            # 1. 파일이 실제로 존재하는지 (-f)
+            # 2. 실행 가능한 파일인지 (-x) 확인 (라이브러리나 문서 제외)
+            if [ -f "\$file" ] && [ -x "\$file" ]; then
+                echo "🚀 Auto-exporting binary: \$file"
+                
+                # --bin 옵션 사용, 호스트의 ~/.local/bin 경로로 내보냄
+                distrobox-export --bin "\$file"
+            fi
+        done
+EOF
+}
+
 auto_remove_exported_apps() {
     local pkg_name="$1"
     echo "🔍 Checking for GUI applications in '$pkg_name'..."
@@ -59,6 +85,23 @@ auto_remove_exported_apps() {
                 # 이 명령이 호스트의 ~/.local/share/applications/ 에서 
                 # 해당 컨테이너와 연관된 .desktop 파일을 찾아 삭제합니다.
                 distrobox-export --app "\$file" --delete
+            fi
+        done
+EOF
+}
+
+auto_remove_exported_bins() {
+    local pkg_name="$1"
+    echo "🔍 Checking for binaries in '$pkg_name'..."
+
+    distrobox-enter "$CONTAINER_NAME" -- bash <<EOF
+        TARGET="$pkg_name"
+        
+        pacman -Qlq "\$TARGET" 2>/dev/null | grep -E '^/usr/bin/' | while read -r file; do
+            if [ -f "\$file" ] && [ -x "\$file" ]; then
+                echo "🗑️  Un-exporting binary: \$file"
+                # --delete 옵션으로 연결 해제
+                distrobox-export --bin "\$file" --delete
             fi
         done
 EOF
@@ -156,6 +199,7 @@ elif [ "$action" == "remove" ]; then
 
     for pkg in "$@"; do
         auto_remove_exported_apps "$pkg"
+        auto_remove_exported_bins "$pkg"
     done
 
     CMD="yay -Rns $* --noconfirm"
@@ -186,21 +230,55 @@ elif [ "$action" == "enter" ]; then
     exit $?
 
 elif [ "$action" == "export" ]; then
+
+    TYPE="$1"
+    NAME="$2"
+
     # 수동 Export 기능
-     if [ $# -eq 0 ]; then
-        echo "❌ Error: App name required."
+    if [ "$TYPE" == "--app" ]; then
+        if [ -z "$NAME" ]; then
+            echo "❌ App name required."
+            exit 1
+        fi
+        distrobox-enter "$CONTAINER_NAME" -- distrobox-export --app "$NAME"
+    elif [ "$TYPE" == "--bin" ]; then
+        if [ -z "$NAME" ]; then
+            echo "❌ Valid binary path required."
+            exit 1
+        fi
+        distrobox-enter "$CONTAINER_NAME" -- distrobox-export --bin "$NAME"
+    else
+        echo "❌ Error: Unknown option"
+        echo "Usage: om export [--app|--bin] ..."
         exit 1
     fi
-    distrobox-enter "$CONTAINER_NAME" -- distrobox-export --app "$1"
+    
     exit $?
 
 elif [ "$action" == "unexport" ]; then
-    # 수동 Export 기능
-     if [ $# -eq 0 ]; then
-        echo "❌ Error: App name required."
+
+    TYPE="$1"
+    NAME="$2"
+
+    # 수동 unexport 기능
+    if [ "$TYPE" == "--app" ]; then
+        if [ -z "$NAME" ]; then
+            echo "❌ App name required."
+            exit 1
+        fi
+        distrobox-enter "$CONTAINER_NAME" -- distrobox-export --app "$NAME" --delete
+    elif [ "$TYPE" == "--bin" ]; then
+        if [ -z "$NAME" ]; then
+            echo "❌ Valid binary path required."
+            exit 1
+        fi
+        distrobox-enter "$CONTAINER_NAME" -- distrobox-export --bin "$NAME" --delete
+    else
+        echo "❌ Error: Unknown option"
+        echo "Usage: om unexport [--app|--bin] ..."
         exit 1
     fi
-    distrobox-enter "$CONTAINER_NAME" -- distrobox-export --app "$1" --delete
+
     exit $?
 
 elif [ "$action" == "clean" ]; then
@@ -239,6 +317,7 @@ if [ $EXIT_CODE -eq 0 ]; then
     if [ "$action" == "install" ]; then
         for pkg in "$@"; do
             auto_export_apps "$pkg"
+            auto_export_bins "$pkg"
         done
     fi
 
