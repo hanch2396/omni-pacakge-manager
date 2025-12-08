@@ -48,8 +48,27 @@ if ! check_dependency "podman"; then
     fi
 fi
 
-echo "📥 Installing distrobox"
-curl -s https://raw.githubusercontent.com/89luca89/distrobox/main/install | sh -s -- --prefix ~/.local
+# distrobox는 모든 시스템의 통일성을 위해 직접 설치
+# nixos의 경우는 컨테이너 실행 오류로 인해 사용자가 직접 설치 필요
+if [ -f /etc/os-release ]; then
+    # 파일을 로드하여 변수들을 가져옵니다
+    . /etc/os-release
+
+    PKG="distrobox"
+    
+    if [ "$ID" == "nixos" ]; then
+        if ! command -v $PKG &> /dev/null; then
+            echo "❌ $PKG could not be found."
+            echo "⚠️  Please install 'distrobox' manually."
+            exit 1
+        else
+            echo "✅ $PKG is installed."
+        fi
+    else
+        echo "📥 Installing distrobox"
+        curl -s https://raw.githubusercontent.com/89luca89/distrobox/main/install | sh -s -- --prefix ~/.local
+    fi
+fi
 
 # 3. dpm 스크립트 설치
 echo "📥 Installing om to ${HOME}/.local/bin..."
