@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # --- 설정 ---
 CONTAINER_NAME="om-arch" # Distrobox 컨테이너 이름

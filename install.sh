@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 echo "🚀 om (Omni Package Manager) Installer"
 
