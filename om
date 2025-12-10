@@ -360,7 +360,7 @@ else
     # 알 수 없는 명령어 처리 (오타 방지)
     echo "❌ Unknown command: '$action'"
     echo "   Did you mean 'install'?"
-    echo "Usage: om [init|self-update|install|remove|update|enter|export|unexport|clean] ..."
+    echo "Usage: om [init|resolve|self-update|install|remove|update|enter|export|unexport|clean] ..."
     exit 1
 fi
 
