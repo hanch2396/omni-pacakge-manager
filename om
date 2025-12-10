@@ -195,6 +195,59 @@ if [ "$action" == "self-update" ]; then
     exit 0
 fi
 
+# ---------------------------------------------------------
+# Resolve (복구)
+# ---------------------------------------------------------
+if [ "$action" == "resolve" ]; then
+    echo "🚑 Starting container recovery process..."
+
+    # 1. 컨테이너 존재 확인
+    if ! podman container exists "$CONTAINER_NAME"; then
+        echo "❌ Container '$CONTAINER_NAME' not found."
+        echo "   Nothing to resolve. Run 'om init' to create a new one."
+        exit 1
+    fi
+
+    BACKUP_IMAGE="localhost/${CONTAINER_NAME}-recovery:latest"
+
+    # 2. 현재 상태 백업 (Commit)
+    echo "📸 Step 1/4: Backing up current container state..."
+    echo "   Target Image: $BACKUP_IMAGE"
+    if podman commit "$CONTAINER_NAME" "$BACKUP_IMAGE"; then
+        echo "   -> Backup successful."
+    else
+        echo "❌ Backup failed! Aborting to prevent data loss."
+        exit 1
+    fi
+
+    # 3. 기존 컨테이너 삭제
+    echo "🗑️  Step 2/4: Removing broken container..."
+    distrobox stop "$CONTAINER_NAME" --yes 2>/dev/null
+    distrobox rm "$CONTAINER_NAME" --force
+    
+    # 4. 백업 이미지로 재생성
+    echo "✨ Step 3/4: Re-creating container from backup..."
+    if distrobox create --name "$CONTAINER_NAME" --image "$BACKUP_IMAGE" --yes; then
+        echo "   -> Container recreated."
+    else
+        echo "❌ Failed to recreate container."
+        exit 1
+    fi
+
+    # 5. 복구 확인
+    echo "🧪 Step 4/4: Verifying restoration..."
+    if distrobox-enter "$CONTAINER_NAME" -- true; then
+        echo "✅ Recovery successful!" 
+        echo "   Your packages and files are intact, and the internal environment has been reset."
+    else
+        echo "⚠️  Recovery completed, but self-test failed."
+        echo "   Please check logs manually."
+        exit 1
+    fi
+
+    exit 0
+fi
+
 shift  # 첫 번째 인자(install, upgrade 등)를 목록에서 제거
        # 이제부터 $1, $2... 는 모두 패키지 이름이 됩니다. ($@)
 
