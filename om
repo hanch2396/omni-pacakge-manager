@@ -3,10 +3,19 @@
 # --- 설정 ---
 CONTAINER_NAME="om-arch" # Distrobox 컨테이너 이름
 
+# 패키지 목록 저장 경로 설정
+CONFIG_DIR="${HOME}/.config/om"
+PKG_LIST_FILE="${CONFIG_DIR}/packages.txt"
+
+# 설정 디렉토리 및 파일 생성
+mkdir -p "$CONFIG_DIR"
+touch "$PKG_LIST_FILE"
+
 action=$1
 
 CMD=""
 LOG_MSG=""
+TARGET_PKGS="" # 설치/삭제/복구 대상 패키지 목록을 담을 변수
 
 # ---------------------------------------------------------
 # 함수: 설치된 패키지에서 .desktop 파일을 찾아 자동 Export
@@ -248,6 +257,31 @@ if [ "$action" == "resolve" ]; then
     exit 0
 fi
 
+# ---------------------------------------------------------
+# 신규 기능: Resolve Packages (패키지 목록으로 재설치)
+# ---------------------------------------------------------
+if [ "$action" == "resolve-pkgs" ]; then
+    echo "📋 Reading saved package list..."
+    
+    if [ ! -s "$PKG_LIST_FILE" ]; then
+        echo "⚠️  No saved packages found in $PKG_LIST_FILE."
+        exit 0
+    fi
+    
+    # 파일에서 패키지 목록 읽기 (개행 문자를 공백으로 변환)
+    SAVED_PKGS=$(cat "$PKG_LIST_FILE" | tr '\n' ' ')
+    
+    echo "📜 Found saved packages: $SAVED_PKGS"
+    
+    # CMD와 TARGET_PKGS 설정
+    TARGET_PKGS="$SAVED_PKGS"
+    CMD="yay -S $TARGET_PKGS --noconfirm --needed" # --needed: 이미 있으면 건너뜀
+    LOG_MSG="📦 Re-installing and linking saved packages..."
+    
+    # 아래 로직 흐름을 타기 위해 action을 install로 위장하거나 별도 처리
+    # 여기서는 TARGET_PKGS가 설정되었으므로 아래 공통 로직을 그대로 사용 가능
+fi
+
 shift  # 첫 번째 인자(install, upgrade 등)를 목록에서 제거
        # 이제부터 $1, $2... 는 모두 패키지 이름이 됩니다. ($@)
 
@@ -257,6 +291,7 @@ if [ "$action" == "install" ]; then
         echo "❌ Error: Package name(s) required."
         exit 1
     fi
+    TARGET_PKGS="$@"
     
     # $* : 남은 모든 인자를 공백으로 연결 (예: "pkg1 pkg2 pkg3")
     CMD="yay -S $* --noconfirm"
@@ -267,6 +302,7 @@ elif [ "$action" == "remove" ]; then
         echo "❌ Error: Package name(s) required."
         exit 1
     fi
+    TARGET_PKGS="$@"
 
     for pkg in "$@"; do
         auto_remove_exported_apps "$pkg"
@@ -360,7 +396,7 @@ else
     # 알 수 없는 명령어 처리 (오타 방지)
     echo "❌ Unknown command: '$action'"
     echo "   Did you mean 'install'?"
-    echo "Usage: om [init|resolve|self-update|install|remove|update|enter|export|unexport|clean] ..."
+    echo "Usage: om [init|resolve|resolve-pkgs|self-update|install|remove|update|enter|export|unexport|clean] ..."
     exit 1
 fi
 
@@ -387,9 +423,32 @@ if [ $EXIT_CODE -eq 0 ]; then
     # 성공했으므로 자동 Export 실행
     if [ "$action" == "install" ]; then
         for pkg in "$@"; do
+            # 파일에 패키지명 추가
+            echo "$pkg" >> "$PKG_LIST_FILE"
+
             auto_export_apps "$pkg"
             auto_export_bins "$pkg"
         done
+
+        # 중복 제거 및 정렬
+        sort -u "$PKG_LIST_FILE" -o "$PKG_LIST_FILE"
+        echo "📝 Updated package list: $PKG_LIST_FILE"
+    
+    # 2. Resolve-pkgs 성공 시: Auto Export만 수행 (파일은 이미 있음)
+    elif [ "$action" == "resolve-pkgs" ]; then
+        for pkg in $TARGET_PKGS; do
+            auto_export_apps "$pkg"
+            auto_export_bins "$pkg"
+        done
+        echo "📝 Re-synced applications from saved list."
+
+    # 3. Remove 성공 시: 파일에서 삭제
+    elif [ "$action" == "remove" ]; then
+        for pkg in $TARGET_PKGS; do
+            # 해당 패키지 라인 삭제 (정확히 일치하는 라인만)
+            sed -i "/^$pkg$/d" "$PKG_LIST_FILE"
+        done
+        echo "📝 Removed packages from list: $PKG_LIST_FILE"
     fi
 
 else
