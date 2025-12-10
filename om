@@ -31,6 +31,24 @@ auto_export_apps() {
                 # app=\$(basename "\$file" .desktop)
                 echo "🚀 Auto-exporting: \$file"
                 distrobox-export --app "\$file"
+
+                # ---------------------------------------------------------
+                # 파일 이름에서 컨테이너 접두사 제거 로직
+                # ---------------------------------------------------------
+                base_name=\$(basename "\$file") # 예: firefox.desktop
+                export_path="\$HOME/.local/share/applications"
+                
+                # 생성된 파일명: om-arch-firefox.desktop
+                created_file="\$export_path/$CONTAINER_NAME-\$base_name"
+                
+                # 원하는 파일명: firefox.desktop
+                target_file="\$export_path/\$base_name"
+
+                # 파일이 생성되었는지 확인 후 이름 변경
+                if [ -f "\$created_file" ]; then
+                    mv "\$created_file" "\$target_file"
+                    echo "✨ Renamed desktop file to: \$target_file"
+                fi
             fi
         done
 EOF
